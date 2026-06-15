@@ -7,7 +7,13 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Cella",
-            path: "Sources/Cella"
+            path: "Sources/Cella",
+            resources: [
+                .process("Resources")
+            ],
+            linkerSettings: [
+                .linkedFramework("ServiceManagement")
+            ]
         )
     ]
 )

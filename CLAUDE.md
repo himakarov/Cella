@@ -5,7 +5,7 @@ macOS menu bar app that shows battery percentage and time remaining until discha
 ## Stack
 
 - Swift + SwiftUI — UI and app lifecycle
-- IOKit — battery data (charge level, time remaining, charging state)
+- IOKit.ps — battery data via `IOPSCopyPowerSourcesInfo` / `IOPSCopyPowerSourcesList` / `IOPSGetPowerSourceDescription`
 
 ## Running
 
@@ -13,16 +13,46 @@ macOS menu bar app that shows battery percentage and time remaining until discha
 swift run
 ```
 
-The app appears as a battery icon in the macOS menu bar. Click it to open the popover.
+The app appears in the macOS menu bar. Click the icon to open the popover.
 
 ## Structure
 
 ```
 Package.swift
 Sources/Cella/
-  CellaApp.swift   — @main entry point, MenuBarExtra scene
+  CellaApp.swift       — @main entry point, MenuBarExtra scene, BatteryPopover view
+  BatteryMonitor.swift — ObservableObject: reads IOKit power sources, publishes
+                         percentage + BatteryStatus enum,
+                         live-updates via IOPSNotificationCreateRunLoopSource + 30s Timer
 ```
+
+## Battery status model
+
+`BatteryStatus` enum (four explicit states):
+
+| Case | Condition | `kIOPSIsChargingKey` | `Power Source State` | `kIOPSIsChargedKey` |
+|------|-----------|----------------------|----------------------|---------------------|
+| `.onBattery(minutesToEmpty:)` | On battery | 0 | Battery | 0 |
+| `.charging(minutesToFull:)` | Actively charging | 1 | AC Power | 0 |
+| `.chargeLimited` | AC connected, charge limit reached | 0 | AC Power | 0 |
+| `.charged` | Fully charged | 0 | AC Power | 1 |
+
+Key insight: use `kIOPSIsChargingKey` (not `Power Source State`) to distinguish
+`.charging` from `.chargeLimited` — both have `AC Power` state but the system stops
+current flow at the charge limit (e.g. 80%), so `Is Charging = 0`.
+
+## Menu bar label format
+
+| State | Label | Icon |
+|-------|-------|------|
+| `.onBattery(nil)` | `80% · …` | battery.N |
+| `.onBattery(mins)` | `80% · 3:42` | battery.N |
+| `.charging(nil)` | `80% · Заряжается` | bolt.fill |
+| `.charging(mins)` | `80% · 1:30` | bolt.fill |
+| `.chargeLimited` | `80%` | battery.N |
+| `.charged` | `100% · Заряжено` | battery.100 |
 
 ## Status
 
-Minimal skeleton. Battery icon appears in the menu bar, popover shows a placeholder text. Battery logic not yet implemented.
+Battery monitoring fully implemented with correct four-state model. Charge limit
+state correctly detected and displayed without misleading time estimates.
