@@ -92,6 +92,9 @@ struct BatteryPopover: View {
                 set: { battery.setLaunchAtLogin($0) }
             ))
             .font(.subheadline)
+            Divider()
+            Button("Завершить Cella") { NSApp.terminate(nil) }
+                .font(.subheadline)
         }
         .padding()
         .frame(minWidth: 220)
