@@ -239,12 +239,31 @@ struct SettingsView: View {
             Divider()
                 .padding(.vertical, 8)
 
+            HStack {
+                Spacer()
+                VStack(spacing: 3) {
+                    Text("Cella \(appVersion)")
+                        .fontWeight(.medium)
+                    Text("by himakarov")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.caption)
+                Spacer()
+            }
+
+            Divider()
+                .padding(.vertical, 8)
+
             Button(t("Завершить Cella", "Quit Cella")) { NSApp.terminate(nil) }
                 .foregroundStyle(.red)
         }
         .font(.subheadline)
         .padding()
         .frame(minWidth: 220)
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     }
 
     private func t(_ ru: String, _ en: String) -> String { lang == "en" ? en : ru }
