@@ -10,10 +10,17 @@ macOS menu bar app that shows battery percentage and time remaining until discha
 ## Running
 
 ```
-swift run
+./redeploy.sh
 ```
 
-The app appears in the macOS menu bar. Click the icon to open the popover.
+Полный цикл: останавливает текущий процесс, собирает release-бандл,
+разворачивает в `/Applications/Cella.app` и запускает его.
+
+**Правило:** после любого изменения кода, которое нужно проверить
+вживую, финальным шагом всегда запускать `./redeploy.sh`.
+Ручные `pkill`/`swift run` больше не нужны — `redeploy.sh` покрывает всё.
+
+`build.sh` — только сборка без деплоя (используется из `redeploy.sh`).
 
 ## Structure
 
