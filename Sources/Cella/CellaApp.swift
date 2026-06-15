@@ -19,6 +19,7 @@ struct MenuBarLabel: View {
     @AppStorage("menuBar.showIcon") private var showIcon = true
     @AppStorage("menuBar.showPercentage") private var showPercentage = true
     @AppStorage("menuBar.showTime") private var showTime = true
+    @AppStorage("language") private var lang = "ru"
 
     var body: some View {
         HStack(spacing: 4) {
@@ -36,22 +37,22 @@ struct MenuBarLabel: View {
     private var labelText: String {
         var parts: [String] = []
         if showPercentage { parts.append("\(battery.percentage)%") }
-        if showTime, let t = timeString { parts.append(t) }
+        if showTime, let time = timeString { parts.append(time) }
         return parts.joined(separator: " · ")
     }
 
     private var timeString: String? {
         switch battery.status {
         case .onBattery(let mins):
-            guard let mins else { return "Расчёт…" }
-            return formatHM(mins)
+            guard let mins else { return t("Расчёт…", "Calc…") }
+            return formatHM(mins, lang: lang)
         case .charging(let mins):
-            guard let mins else { return "Заряжается" }
-            return formatHM(mins)
+            guard let mins else { return t("Заряжается", "Charging") }
+            return formatHM(mins, lang: lang)
         case .chargeLimited:
             return nil
         case .charged:
-            return "Заряжено"
+            return t("Заряжено", "Charged")
         }
     }
 
@@ -70,11 +71,14 @@ struct MenuBarLabel: View {
             return .green
         }
     }
+
+    private func t(_ ru: String, _ en: String) -> String { lang == "en" ? en : ru }
 }
 
 struct BatteryPopover: View {
     @ObservedObject var battery: BatteryMonitor
     @State private var showSettings = false
+    @AppStorage("language") private var lang = "ru"
 
     var body: some View {
         if showSettings {
@@ -112,9 +116,12 @@ struct BatteryPopover: View {
             }
             if let health = battery.batteryHealth {
                 Divider()
-                Text("Здоровье батареи: \(health.healthPercentage)% · Циклы: \(health.cycleCount)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(t(
+                    "Здоровье батареи: \(health.healthPercentage)% · Циклы: \(health.cycleCount)",
+                    "Battery health: \(health.healthPercentage)% · Cycles: \(health.cycleCount)"
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
         .padding()
@@ -139,25 +146,30 @@ struct BatteryPopover: View {
 
     private var statusLine: String {
         switch battery.status {
-        case .onBattery:     return "На батарее"
-        case .charging:      return "Заряжается"
-        case .chargeLimited: return "Заряд ограничен (лимит \(battery.percentage)%)"
-        case .charged:       return "Заряжена"
+        case .onBattery:     return t("На батарее", "On battery")
+        case .charging:      return t("Заряжается", "Charging")
+        case .chargeLimited: return t("Заряд ограничен (лимит \(battery.percentage)%)",
+                                      "Charge limited (\(battery.percentage)%)")
+        case .charged:       return t("Заряжена", "Charged")
         }
     }
 
     private var detailLine: String? {
         switch battery.status {
         case .onBattery(let mins):
-            guard let mins else { return "Расчёт времени…" }
-            return "\(formatHM(mins)) до разряда"
+            guard let mins else { return t("Расчёт времени…", "Calculating…") }
+            return t("\(formatHM(mins, lang: lang)) до разряда",
+                     "\(formatHM(mins, lang: lang)) until empty")
         case .charging(let mins):
             guard let mins else { return nil }
-            return "\(formatHM(mins)) до полной зарядки"
+            return t("\(formatHM(mins, lang: lang)) до полной зарядки",
+                     "\(formatHM(mins, lang: lang)) until full")
         case .chargeLimited, .charged:
             return nil
         }
     }
+
+    private func t(_ ru: String, _ en: String) -> String { lang == "en" ? en : ru }
 }
 
 struct SettingsView: View {
@@ -167,6 +179,7 @@ struct SettingsView: View {
     @AppStorage("menuBar.showIcon") private var showIcon = true
     @AppStorage("menuBar.showPercentage") private var showPercentage = true
     @AppStorage("menuBar.showTime") private var showTime = true
+    @AppStorage("language") private var lang = "ru"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -176,19 +189,18 @@ struct SettingsView: View {
                 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "chevron.left")
-                        Text("Назад")
+                        Text(t("Назад", "Back"))
                     }
                     .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
                 Spacer()
-                Text("Настройки")
+                Text(t("Настройки", "Settings"))
                     .font(.headline)
                 Spacer()
-                // balance spacer so title is centered
                 HStack(spacing: 3) {
                     Image(systemName: "chevron.left")
-                    Text("Назад")
+                    Text(t("Назад", "Back"))
                 }
                 .hidden()
             }
@@ -196,16 +208,16 @@ struct SettingsView: View {
 
             Divider()
             VStack(alignment: .leading, spacing: 10) {
-                Toggle("Иконка", isOn: $showIcon)
-                Toggle("Процент заряда", isOn: $showPercentage)
-                Toggle("Время до разряда/заряда", isOn: $showTime)
+                Toggle(t("Иконка", "Icon"), isOn: $showIcon)
+                Toggle(t("Процент заряда", "Battery percentage"), isOn: $showPercentage)
+                Toggle(t("Время до разряда/заряда", "Time remaining"), isOn: $showTime)
             }
             .padding(.top, 8)
 
             Divider()
                 .padding(.vertical, 8)
 
-            Toggle("Запускать при входе", isOn: Binding(
+            Toggle(t("Запускать при входе", "Launch at login"), isOn: Binding(
                 get: { battery.launchAtLoginEnabled },
                 set: { battery.setLaunchAtLogin($0) }
             ))
@@ -213,13 +225,29 @@ struct SettingsView: View {
             Divider()
                 .padding(.vertical, 8)
 
-            Button("Завершить Cella") { NSApp.terminate(nil) }
+            HStack {
+                Text(t("Язык", "Language"))
+                Spacer()
+                Picker("", selection: $lang) {
+                    Text("RU").tag("ru")
+                    Text("EN").tag("en")
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+            }
+
+            Divider()
+                .padding(.vertical, 8)
+
+            Button(t("Завершить Cella", "Quit Cella")) { NSApp.terminate(nil) }
                 .foregroundStyle(.red)
         }
         .font(.subheadline)
         .padding()
         .frame(minWidth: 220)
     }
+
+    private func t(_ ru: String, _ en: String) -> String { lang == "en" ? en : ru }
 }
 
 private func batteryIcon(for percentage: Int) -> String {
@@ -242,8 +270,11 @@ private func chargingBatteryIcon(for percentage: Int) -> String {
     }
 }
 
-private func formatHM(_ mins: Int) -> String {
+private func formatHM(_ mins: Int, lang: String) -> String {
     let h = mins / 60
     let m = mins % 60
+    if lang == "en" {
+        return h > 0 ? "\(h)h \(m)m" : "\(m)m"
+    }
     return h > 0 ? "\(h)ч \(m)м" : "\(m)м"
 }
