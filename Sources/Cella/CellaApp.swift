@@ -79,6 +79,7 @@ struct BatteryPopover: View {
     @ObservedObject var battery: BatteryMonitor
     @State private var showSettings = false
     @AppStorage("language") private var lang = "ru"
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         if showSettings {
@@ -89,69 +90,98 @@ struct BatteryPopover: View {
     }
 
     private var batteryView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center) {
-                Image(systemName: popoverIcon)
-                    .font(.system(size: 28))
-                    .foregroundStyle(popoverIconColor)
-                Text("\(battery.percentage)%")
-                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                HStack(spacing: 13) {
+                    BatteryIconView(percentage: battery.percentage, isCharging: isCharging)
+                    Text("\(battery.percentage)%")
+                        .font(.system(size: 34, weight: .bold))
+                        .tracking(-1)
+                }
                 Spacer()
-                Button {
-                    showSettings = true
-                } label: {
+                Button { showSettings = true } label: {
                     Image(systemName: "gearshape")
                         .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.55) : Color.black.opacity(0.45))
                 }
                 .buttonStyle(.plain)
             }
-            Divider()
-            Text(statusLine)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            if let detail = detailLine {
-                Text(detail)
-                    .font(.subheadline)
+
+            customDivider
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(t("СТАТУС", "STATUS"))
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 7)
+
+                HStack(spacing: 6) {
+                    if isCharging {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(chargeAccentColor)
+                    }
+                    Text(statusLine)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(isCharging ? chargeAccentColor : .primary)
+                }
+                .padding(.bottom, 3)
+
+                if let detail = detailLine {
+                    Text(detail)
+                        .font(.system(size: 15))
+                }
             }
+
             if battery.batteryHealth != nil || battery.temperature != nil {
-                Divider()
-                VStack(alignment: .leading, spacing: 4) {
+                customDivider
+                HStack(alignment: .top, spacing: 8) {
                     if let health = battery.batteryHealth {
-                        Text(t(
-                            "Здоровье батареи: \(health.healthPercentage)% · Циклы: \(health.cycleCount)",
-                            "Battery health: \(health.healthPercentage)% · Cycles: \(health.cycleCount)"
-                        ))
+                        statCell(value: "\(health.healthPercentage)%", label: t("Здоровье", "Health"))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        statCell(value: "\(health.cycleCount)", label: t("Циклы", "Cycles"))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if let temp = battery.temperature {
-                        Text(t(
-                            "Температура: \(String(format: "%.1f", temp)) °C",
-                            "Temperature: \(String(format: "%.1f", temp)) °C"
-                        ))
+                        statCell(value: String(format: "%.1f°", temp), label: t("Темп.", "Temp."))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
         }
-        .padding()
-        .frame(minWidth: 220)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 18)
+        .frame(width: 300)
     }
 
-    private var popoverIcon: String {
-        switch battery.status {
-        case .charging: return chargingBatteryIcon(for: battery.percentage)
-        default:        return batteryIcon(for: battery.percentage)
+    @ViewBuilder
+    private func statCell(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(value)
+                .font(.system(size: 17, weight: .semibold))
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
         }
     }
 
-    private var popoverIconColor: Color {
-        switch battery.status {
-        case .onBattery:
-            return battery.percentage <= 20 ? .red : .primary
-        case .charging, .chargeLimited, .charged:
-            return .green
-        }
+    private var isCharging: Bool {
+        if case .charging = battery.status { return true }
+        return false
+    }
+
+    private var chargeAccentColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.196, green: 0.843, blue: 0.294)
+            : Color(red: 0.157, green: 0.655, blue: 0.271)
+    }
+
+    private var customDivider: some View {
+        Rectangle()
+            .fill(colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.10))
+            .frame(height: 0.5)
+            .padding(.vertical, 14)
     }
 
     private var statusLine: String {
@@ -180,6 +210,52 @@ struct BatteryPopover: View {
     }
 
     private func t(_ ru: String, _ en: String) -> String { lang == "en" ? en : ru }
+}
+
+struct BatteryIconView: View {
+    let percentage: Int
+    let isCharging: Bool
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var borderColor: Color {
+        colorScheme == .dark ? .white.opacity(0.85) : .black.opacity(0.55)
+    }
+
+    private var fillColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.196, green: 0.843, blue: 0.294)
+            : Color(red: 0.204, green: 0.78, blue: 0.349)
+    }
+
+    var body: some View {
+        HStack(spacing: 1) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(borderColor, lineWidth: 2)
+                GeometryReader { geo in
+                    let pad: CGFloat = 4.5
+                    let fillW = max(0, (geo.size.width - pad * 2) * CGFloat(percentage) / 100)
+                    let fillH = geo.size.height - pad * 2
+                    HStack(spacing: 0) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(fillColor)
+                            .frame(width: fillW, height: fillH)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(pad)
+                }
+                if isCharging {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .frame(width: 46, height: 23)
+            RoundedRectangle(cornerRadius: 2)
+                .fill(borderColor)
+                .frame(width: 2.5, height: 8)
+        }
+    }
 }
 
 struct SettingsView: View {
@@ -257,7 +333,7 @@ struct SettingsView: View {
                     Text("by himakarov")
                         .foregroundStyle(.secondary)
                 }
-                .font(.caption)
+                .font(.footnote)
                 Spacer()
             }
 
@@ -267,7 +343,7 @@ struct SettingsView: View {
             Button(t("Завершить Cella", "Quit Cella")) { NSApp.terminate(nil) }
                 .foregroundStyle(.red)
         }
-        .font(.subheadline)
+        .font(.body)
         .padding()
         .frame(minWidth: 220)
     }
