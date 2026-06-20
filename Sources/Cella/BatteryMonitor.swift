@@ -23,6 +23,7 @@ final class BatteryMonitor: ObservableObject {
     @Published var percentage: Int = 0
     @Published var status: BatteryStatus = .onBattery(minutesToEmpty: nil)
     @Published var batteryHealth: BatteryHealthInfo? = nil
+    @Published var temperature: Double? = nil
     @Published var launchAtLoginEnabled: Bool = SMAppService.mainApp.status == .enabled
 
     private var runLoopSource: CFRunLoopSource?
@@ -31,10 +32,12 @@ final class BatteryMonitor: ObservableObject {
 
     init() {
         refresh()
+        refreshTemperature()
         refreshHealth()
         subscribeToChanges()
         statusTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             self?.refresh()
+            self?.refreshTemperature()
         }
         healthTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
             self?.refreshHealth()
@@ -59,6 +62,20 @@ final class BatteryMonitor: ObservableObject {
         if let src = runLoopSource {
             CFRunLoopAddSource(CFRunLoopGetMain(), src, .defaultMode)
         }
+    }
+
+    private func refreshTemperature() {
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
+        guard service != IO_OBJECT_NULL else { return }
+        defer { IOObjectRelease(service) }
+
+        var props: Unmanaged<CFMutableDictionary>?
+        guard IORegistryEntryCreateCFProperties(service, &props, kCFAllocatorDefault, 0) == KERN_SUCCESS,
+              let dict = props?.takeRetainedValue() as? [String: Any],
+              let rawTemp = dict["Temperature"] as? Int else { return }
+
+        // Temperature is stored in hundredths of a degree Celsius
+        temperature = Double(rawTemp) / 100.0
     }
 
     func refresh() {

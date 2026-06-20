@@ -114,12 +114,22 @@ struct BatteryPopover: View {
                 Text(detail)
                     .font(.subheadline)
             }
-            if let health = battery.batteryHealth {
+            if battery.batteryHealth != nil || battery.temperature != nil {
                 Divider()
-                Text(t(
-                    "Здоровье батареи: \(health.healthPercentage)% · Циклы: \(health.cycleCount)",
-                    "Battery health: \(health.healthPercentage)% · Cycles: \(health.cycleCount)"
-                ))
+                VStack(alignment: .leading, spacing: 4) {
+                    if let health = battery.batteryHealth {
+                        Text(t(
+                            "Здоровье батареи: \(health.healthPercentage)% · Циклы: \(health.cycleCount)",
+                            "Battery health: \(health.healthPercentage)% · Cycles: \(health.cycleCount)"
+                        ))
+                    }
+                    if let temp = battery.temperature {
+                        Text(t(
+                            "Температура: \(String(format: "%.1f", temp)) °C",
+                            "Temperature: \(String(format: "%.1f", temp)) °C"
+                        ))
+                    }
+                }
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
