@@ -89,7 +89,9 @@ struct BatteryPopover: View {
                 batteryView
             }
         }
-        .onDisappear { showSettings = false }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            showSettings = false
+        }
     }
 
     private var batteryView: some View {
