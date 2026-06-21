@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+VERSION="${1:-1.0}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP="$SCRIPT_DIR/Cella.app"
 RESOURCES_SRC="$SCRIPT_DIR/Sources/Cella/Resources/AppIcon.appiconset"
@@ -16,7 +17,7 @@ mkdir -p "$APP/Contents/Resources"
 
 cp "$SCRIPT_DIR/.build/release/Cella" "$APP/Contents/MacOS/Cella"
 
-cat > "$APP/Contents/Info.plist" << 'PLIST'
+cat > "$APP/Contents/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -29,9 +30,9 @@ cat > "$APP/Contents/Info.plist" << 'PLIST'
     <key>CFBundleName</key>
     <string>Cella</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>$VERSION</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>$VERSION</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleIconFile</key>

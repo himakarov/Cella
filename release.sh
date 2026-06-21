@@ -10,7 +10,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ZIP="/tmp/Cella.zip"
 
-./build.sh
+./build.sh "${VERSION#v}"
 
 echo "==> Zipping Cella.app..."
 cd "$SCRIPT_DIR"
