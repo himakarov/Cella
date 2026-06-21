@@ -22,4 +22,5 @@ gh release create "$VERSION" "$ZIP" \
     --notes "See commit history for changes."
 
 rm "$ZIP"
+rm -rf "$SCRIPT_DIR/Cella.app"
 echo "Done: released $VERSION → https://github.com/himakarov/Cella/releases/tag/$VERSION"
