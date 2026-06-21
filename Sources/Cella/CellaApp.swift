@@ -335,9 +335,91 @@ struct BatteryIconView: View {
     }
 }
 
+enum UpdateStatus: Equatable {
+    case idle, checking, upToDate, updating
+    case available(version: String)
+    case error(String)
+}
+
+final class UpdateChecker: ObservableObject {
+    @Published var status: UpdateStatus = .idle
+
+    private let repo = "himakarov/Cella"
+
+    func checkForUpdates() {
+        status = .checking
+        let url = URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!
+        var req = URLRequest(url: url)
+        req.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                guard error == nil,
+                      let data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let tag = json["tag_name"] as? String else {
+                    self.status = .error("Не удалось получить данные")
+                    return
+                }
+                let latest = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+                let current = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+                self.status = latest == current ? .upToDate : .available(version: latest)
+            }
+        }.resume()
+    }
+
+    func installUpdate() {
+        status = .updating
+        let zipURL = URL(string: "https://github.com/\(repo)/releases/latest/download/Cella.zip")!
+        let tmpZip = "/tmp/CellaUpdate.zip"
+        let scriptPath = "/tmp/cella_update.sh"
+
+        URLSession.shared.downloadTask(with: zipURL) { [weak self] tmpURL, _, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                guard error == nil, let tmpURL else {
+                    self.status = .error("Не удалось скачать")
+                    return
+                }
+                do {
+                    let dest = URL(fileURLWithPath: tmpZip)
+                    if FileManager.default.fileExists(atPath: tmpZip) {
+                        try FileManager.default.removeItem(at: dest)
+                    }
+                    try FileManager.default.moveItem(at: tmpURL, to: dest)
+
+                    let script = """
+                    #!/bin/bash
+                    sleep 1
+                    pkill -x Cella 2>/dev/null || true
+                    rm -rf /Applications/Cella.app
+                    unzip -q "\(tmpZip)" -d /Applications
+                    xattr -cr /Applications/Cella.app
+                    open /Applications/Cella.app
+                    rm "\(tmpZip)"
+                    rm "$0"
+                    """
+                    try script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
+                    try FileManager.default.setAttributes(
+                        [.posixPermissions: 0o755], ofItemAtPath: scriptPath
+                    )
+                    let p = Process()
+                    p.executableURL = URL(fileURLWithPath: "/bin/bash")
+                    p.arguments = [scriptPath]
+                    try p.run()
+                    NSApp.terminate(nil)
+                } catch {
+                    self.status = .error(error.localizedDescription)
+                }
+            }
+        }.resume()
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var battery: BatteryMonitor
     @Binding var showSettings: Bool
+    @StateObject private var updater = UpdateChecker()
 
     @AppStorage("menuBar.showIcon") private var showIcon = true
     @AppStorage("menuBar.showPercentage") private var showPercentage = true
@@ -417,12 +499,55 @@ struct SettingsView: View {
             Divider()
                 .padding(.vertical, 8)
 
+            updateSection
+
+            Divider()
+                .padding(.vertical, 8)
+
             Button(t("Завершить Cella", "Quit Cella")) { NSApp.terminate(nil) }
                 .foregroundStyle(.red)
         }
         .font(.body)
         .padding()
         .frame(minWidth: 220)
+    }
+
+    @ViewBuilder
+    private var updateSection: some View {
+        switch updater.status {
+        case .idle:
+            Button(t("Проверить обновления", "Check for updates")) {
+                updater.checkForUpdates()
+            }
+        case .checking:
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text(t("Проверяем…", "Checking…"))
+                    .foregroundStyle(.secondary)
+            }
+        case .upToDate:
+            Text(t("Актуальная версия", "Up to date"))
+                .foregroundStyle(.secondary)
+        case .available(let version):
+            HStack {
+                Text(t("Доступна \(version)", "Available \(version)"))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button(t("Обновить", "Update")) {
+                    updater.installUpdate()
+                }
+            }
+        case .updating:
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text(t("Загрузка…", "Downloading…"))
+                    .foregroundStyle(.secondary)
+            }
+        case .error(let msg):
+            Text(msg)
+                .foregroundStyle(.red)
+                .font(.caption)
+        }
     }
 
     private var appVersion: String {
