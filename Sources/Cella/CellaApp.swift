@@ -45,10 +45,10 @@ struct MenuBarLabel: View {
         switch battery.status {
         case .onBattery(let mins):
             guard let mins else { return t("Расчёт…", "Calc…") }
-            return formatHM(mins, lang: lang)
+            return "~\(formatHM(mins, lang: lang))"
         case .charging(let mins):
-            guard let mins else { return t("Заряжается", "Charging") }
-            return formatHM(mins, lang: lang)
+            guard let mins else { return t("Зарядка", "Charging") }
+            return "~\(formatHM(mins, lang: lang))"
         case .chargeLimited:
             return nil
         case .charged:
@@ -121,21 +121,75 @@ struct BatteryPopover: View {
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 7)
 
-                HStack(spacing: 6) {
-                    if isCharging {
+                if isOnBattery {
+                    Text(statusLine)
+                        .font(.system(size: 15, weight: .semibold))
+                        .padding(.bottom, 10)
+
+                    HStack(alignment: .bottom) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(t("Осталось", "Remaining"))
+                                .font(.system(size: 11))
+                                .foregroundStyle(.primary.opacity(0.45))
+                            Text(timeRemainingText)
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                        Spacer()
+                        if let rate = battery.dischargeRate {
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text(t("Расход сейчас", "Drain rate"))
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.primary.opacity(0.45))
+                                HStack(spacing: 4) {
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(drainAccentColor)
+                                    Text("~\(rate)% / \(t("час", "hr"))")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundStyle(drainAccentColor)
+                                }
+                            }
+                        }
+                    }
+                } else if isCharging {
+                    HStack(spacing: 6) {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 12))
                             .foregroundStyle(chargeAccentColor)
+                        Text(statusLine)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(chargeAccentColor)
                     }
+                    .padding(.bottom, 10)
+
+                    HStack(alignment: .bottom) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(t("До полной", "Until full"))
+                                .font(.system(size: 11))
+                                .foregroundStyle(.primary.opacity(0.45))
+                            Text(timeToFullText)
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                        Spacer()
+                        if let readyAt = readyAtText {
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text(t("Будет готов", "Ready at"))
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.primary.opacity(0.45))
+                                HStack(spacing: 5) {
+                                    Image(systemName: "clock")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(chargeAccentColor)
+                                    Text(readyAt)
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundStyle(chargeAccentColor)
+                                }
+                            }
+                        }
+                    }
+                } else {
                     Text(statusLine)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(isCharging ? chargeAccentColor : .primary)
-                }
-                .padding(.bottom, 3)
-
-                if let detail = detailLine {
-                    Text(detail)
-                        .font(.system(size: 15))
                 }
             }
 
@@ -176,6 +230,24 @@ struct BatteryPopover: View {
         return false
     }
 
+    private var isOnBattery: Bool {
+        if case .onBattery = battery.status { return true }
+        return false
+    }
+
+    private var timeRemainingText: String {
+        guard case .onBattery(let mins) = battery.status, let mins else {
+            return t("Расчёт…", "Calc…")
+        }
+        return "~\(formatHM(mins, lang: lang))"
+    }
+
+    private var drainAccentColor: Color {
+        colorScheme == .dark
+            ? Color(red: 1.0, green: 0.624, blue: 0.039)
+            : Color(red: 1.0, green: 0.584, blue: 0.0)
+    }
+
     private var chargeAccentColor: Color {
         colorScheme == .dark
             ? Color(red: 0.196, green: 0.843, blue: 0.294)
@@ -192,26 +264,26 @@ struct BatteryPopover: View {
     private var statusLine: String {
         switch battery.status {
         case .onBattery:     return t("На батарее", "On battery")
-        case .charging:      return t("Заряжается", "Charging")
+        case .charging:      return t("Зарядка", "Charging")
         case .chargeLimited: return t("Заряд ограничен (лимит \(battery.percentage)%)",
                                       "Charge limited (\(battery.percentage)%)")
         case .charged:       return t("Заряжена", "Charged")
         }
     }
 
-    private var detailLine: String? {
-        switch battery.status {
-        case .onBattery(let mins):
-            guard let mins else { return t("Расчёт времени…", "Calculating…") }
-            return t("\(formatHM(mins, lang: lang)) до разряда",
-                     "\(formatHM(mins, lang: lang)) until empty")
-        case .charging(let mins):
-            guard let mins else { return nil }
-            return t("\(formatHM(mins, lang: lang)) до полной зарядки",
-                     "\(formatHM(mins, lang: lang)) until full")
-        case .chargeLimited, .charged:
-            return nil
+    private var timeToFullText: String {
+        guard case .charging(let mins) = battery.status, let mins else {
+            return t("Расчёт…", "Calc…")
         }
+        return "~\(formatHM(mins, lang: lang))"
+    }
+
+    private var readyAtText: String? {
+        guard case .charging(let mins) = battery.status, let mins else { return nil }
+        let readyDate = Date().addingTimeInterval(TimeInterval(mins * 60))
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: readyDate)
     }
 
     private func t(_ ru: String, _ en: String) -> String { lang == "en" ? en : ru }

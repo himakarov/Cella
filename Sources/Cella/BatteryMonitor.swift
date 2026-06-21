@@ -24,6 +24,7 @@ final class BatteryMonitor: ObservableObject {
     @Published var status: BatteryStatus = .onBattery(minutesToEmpty: nil)
     @Published var batteryHealth: BatteryHealthInfo? = nil
     @Published var temperature: Double? = nil
+    @Published var dischargeRate: Int? = nil
     @Published var launchAtLoginEnabled: Bool = SMAppService.mainApp.status == .enabled
 
     private var runLoopSource: CFRunLoopSource?
@@ -106,6 +107,17 @@ final class BatteryMonitor: ObservableObject {
         } else {
             status = .onBattery(minutesToEmpty: rawEmpty > 0 ? rawEmpty : nil)
         }
+
+        updateDischargeRate()
+    }
+
+    private func updateDischargeRate() {
+        guard case .onBattery(let mins) = status,
+              let mins, mins > 0, percentage > 0 else {
+            dischargeRate = nil
+            return
+        }
+        dischargeRate = max(1, Int((Double(percentage) / (Double(mins) / 60.0)).rounded()))
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
