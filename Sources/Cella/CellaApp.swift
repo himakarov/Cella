@@ -518,6 +518,7 @@ struct SettingsView: View {
         .font(.body)
         .padding()
         .frame(minWidth: 220)
+        .onAppear { updater.checkForUpdates() }
     }
 
     @ViewBuilder
@@ -534,8 +535,14 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
         case .upToDate:
-            Text(t("Актуальная версия", "Up to date"))
-                .foregroundStyle(.secondary)
+            HStack {
+                Text(t("Актуальная версия", "Up to date"))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button(t("Обновить", "Refresh")) {
+                    updater.checkForUpdates()
+                }
+            }
         case .available(let version):
             HStack {
                 Text(t("Доступна \(version)", "Available \(version)"))
