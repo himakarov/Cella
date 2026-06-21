@@ -82,11 +82,14 @@ struct BatteryPopover: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        if showSettings {
-            SettingsView(battery: battery, showSettings: $showSettings)
-        } else {
-            batteryView
+        Group {
+            if showSettings {
+                SettingsView(battery: battery, showSettings: $showSettings)
+            } else {
+                batteryView
+            }
         }
+        .onDisappear { showSettings = false }
     }
 
     private var batteryView: some View {
