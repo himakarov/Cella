@@ -143,10 +143,10 @@ struct BatteryPopover: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "chevron.down")
                                         .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(drainAccentColor)
+                                        .foregroundStyle(drainAccentColor(for: rate))
                                     Text("~\(rate)% / \(t("час", "hr"))")
                                         .font(.system(size: 16, weight: .bold))
-                                        .foregroundStyle(drainAccentColor)
+                                        .foregroundStyle(drainAccentColor(for: rate))
                                 }
                             }
                         }
@@ -242,10 +242,18 @@ struct BatteryPopover: View {
         return "~\(formatHM(mins, lang: lang))"
     }
 
-    private var drainAccentColor: Color {
-        colorScheme == .dark
-            ? Color(red: 1.0, green: 0.624, blue: 0.039)
-            : Color(red: 1.0, green: 0.584, blue: 0.0)
+    private func drainAccentColor(for rate: Int) -> Color {
+        switch rate {
+        case ...8:  return colorScheme == .dark
+                        ? Color(red: 0.196, green: 0.843, blue: 0.294)
+                        : Color(red: 0.157, green: 0.655, blue: 0.271)
+        case 9...15: return colorScheme == .dark
+                        ? Color(red: 1.0, green: 0.624, blue: 0.039)
+                        : Color(red: 1.0, green: 0.584, blue: 0.0)
+        default:    return colorScheme == .dark
+                        ? Color(red: 1.0, green: 0.27, blue: 0.227)
+                        : Color(red: 0.863, green: 0.196, blue: 0.184)
+        }
     }
 
     private var chargeAccentColor: Color {
