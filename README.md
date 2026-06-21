@@ -5,10 +5,13 @@ A tiny native macOS menu bar app that shows battery percentage and time remainin
 **Features:**
 - Battery percentage, time remaining, and status icon in the menu bar
 - Four states: on battery, charging, charge-limited, fully charged
-- Battery health info (capacity %, cycle count)
+- Drain rate (% / hr) with color indicator — green / orange / red
+- Charging ETA: time until full and clock time when ready
+- Battery health info (capacity %, cycle count, temperature)
 - Configurable menu bar display (icon / percentage / time)
 - English and Russian interface
 - Launch at login
+- In-app updates — check and install new versions without Terminal
 
 ## Install
 
@@ -26,7 +29,9 @@ xattr -cr /Applications/Cella.app && open /Applications/Cella.app
 
 ## Update
 
-Same command as install — it stops the running app, downloads the latest version, and restarts it:
+Open the app → click the menu bar icon → go to **Settings** → click **Check for updates**. If a new version is available, click **Update** — the app will download and restart automatically.
+
+Alternatively, re-run the install command from Terminal:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/himakarov/Cella/main/install.sh | bash
