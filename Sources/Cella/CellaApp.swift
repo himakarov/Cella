@@ -193,6 +193,11 @@ struct BatteryPopover: View {
                 }
             }
 
+            if battery.history.count >= 2 {
+                customDivider
+                HistoryChartView(history: battery.history, lang: lang)
+            }
+
             if battery.batteryHealth != nil || battery.temperature != nil {
                 customDivider
                 HStack(alignment: .top, spacing: 8) {
@@ -340,6 +345,141 @@ struct BatteryIconView: View {
                 .fill(borderColor)
                 .frame(width: 2.5, height: 8)
         }
+    }
+}
+
+struct HistoryChartView: View {
+    let history: [BatterySample]
+    let lang: String
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var dischargeColor: Color {
+        colorScheme == .dark
+            ? Color(red: 1.0, green: 0.624, blue: 0.039)
+            : Color(red: 1.0, green: 0.584, blue: 0.0)
+    }
+    private var chargeColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.196, green: 0.843, blue: 0.294)
+            : Color(red: 0.204, green: 0.780, blue: 0.349)
+    }
+    private var dotBorderColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.141, green: 0.122, blue: 0.169)
+            : Color(red: 0.957, green: 0.953, blue: 0.961)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(lang == "en" ? "DAY HISTORY" : "ИСТОРИЯ ДНЯ")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(.primary.opacity(0.45))
+                Spacer()
+                HStack(spacing: 8) {
+                    legendSwatch(color: dischargeColor, label: lang == "en" ? "discharge" : "разряд")
+                    legendSwatch(color: chargeColor,    label: lang == "en" ? "charge"    : "заряд")
+                }
+            }
+            .padding(.bottom, 8)
+
+            Canvas { ctx, size in
+                guard history.count >= 2 else { return }
+
+                let W = size.width
+                let topY: CGFloat = 5, bottomY: CGFloat = 41
+                let plotH = bottomY - topY
+
+                let t0 = history.first!.time.timeIntervalSince1970
+                let t1 = Date.now.timeIntervalSince1970
+                let tRange = max(t1 - t0, 1)
+                let minP = CGFloat((history.map { $0.percent }.min() ?? 0) - 4)
+                let pRange = max(100 - minP, 1)
+
+                func pt(_ s: BatterySample) -> CGPoint {
+                    let x = CGFloat(s.time.timeIntervalSince1970 - t0) / CGFloat(tRange) * W
+                    let y = topY + (1 - (CGFloat(s.percent) - minP) / pRange) * plotH
+                    return CGPoint(x: x, y: y)
+                }
+
+                let pts = history.map { pt($0) }
+
+                // Area fill
+                var area = Path()
+                area.move(to: CGPoint(x: pts[0].x, y: bottomY))
+                area.addLine(to: pts[0])
+                pts.dropFirst().forEach { area.addLine(to: $0) }
+                area.addLine(to: CGPoint(x: pts.last!.x, y: bottomY))
+                area.closeSubpath()
+                ctx.fill(area, with: .color(dischargeColor.opacity(0.10)))
+
+                // Segments by isCharging
+                var segs: [([CGPoint], Bool)] = []
+                var cur = [pts[0]]
+                var curCharging = history[0].isCharging
+                for i in 1..<history.count {
+                    cur.append(pts[i])
+                    if i == history.count - 1 || history[i + 1].isCharging != curCharging {
+                        segs.append((cur, curCharging))
+                        cur = [pts[i]]
+                        if i + 1 < history.count { curCharging = history[i + 1].isCharging }
+                    }
+                }
+
+                for (segPts, charging) in segs where segPts.count >= 2 {
+                    var line = Path()
+                    line.move(to: segPts[0])
+                    segPts.dropFirst().forEach { line.addLine(to: $0) }
+                    ctx.stroke(line, with: .color(charging ? chargeColor : dischargeColor),
+                               style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                }
+
+                // "Now" dot — border first, then fill
+                let last = pts.last!
+                let r: CGFloat = 3.2
+                var border = Path()
+                border.addEllipse(in: CGRect(x: last.x - r - 1.5, y: last.y - r - 1.5,
+                                             width: (r + 1.5) * 2, height: (r + 1.5) * 2))
+                ctx.fill(border, with: .color(dotBorderColor))
+
+                var dot = Path()
+                dot.addEllipse(in: CGRect(x: last.x - r, y: last.y - r, width: r * 2, height: r * 2))
+                ctx.fill(dot, with: .color(history.last?.isCharging == true ? chargeColor : dischargeColor))
+            }
+            .frame(width: 264, height: 46)
+
+            HStack {
+                if let first = history.first {
+                    Text(timeLabel(first.time))
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.primary.opacity(0.4))
+                }
+                Spacer()
+                Text(lang == "en" ? "now" : "сейчас")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.primary.opacity(0.4))
+            }
+            .padding(.top, 5)
+        }
+    }
+
+    @ViewBuilder
+    private func legendSwatch(color: Color, label: String) -> some View {
+        HStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(color)
+                .frame(width: 9, height: 2.5)
+            Text(label)
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func timeLabel(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f.string(from: date)
     }
 }
 

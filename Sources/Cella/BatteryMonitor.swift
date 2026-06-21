@@ -10,6 +10,12 @@ enum BatteryStatus {
     case charged
 }
 
+struct BatterySample {
+    let time: Date
+    let percent: Int
+    let isCharging: Bool
+}
+
 struct BatteryHealthInfo {
     let cycleCount: Int
     let designCapacity: Int
@@ -25,6 +31,7 @@ final class BatteryMonitor: ObservableObject {
     @Published var batteryHealth: BatteryHealthInfo? = nil
     @Published var temperature: Double? = nil
     @Published var dischargeRate: Int? = nil
+    @Published var history: [BatterySample] = []
     @Published var launchAtLoginEnabled: Bool = SMAppService.mainApp.status == .enabled
 
     private var runLoopSource: CFRunLoopSource?
@@ -107,6 +114,10 @@ final class BatteryMonitor: ObservableObject {
         } else {
             status = .onBattery(minutesToEmpty: rawEmpty > 0 ? rawEmpty : nil)
         }
+
+        let cutoff = Date.now.addingTimeInterval(-7 * 3600)
+        history.append(BatterySample(time: .now, percent: percentage, isCharging: isActuallyCharging))
+        history.removeAll { $0.time < cutoff }
 
         updateDischargeRate()
     }
