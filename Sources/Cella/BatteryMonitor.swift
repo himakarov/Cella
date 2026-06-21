@@ -18,11 +18,7 @@ struct BatterySample {
 
 struct BatteryHealthInfo {
     let cycleCount: Int
-    let designCapacity: Int
-    let currentMaxCapacity: Int
-    var healthPercentage: Int {
-        Int((Double(currentMaxCapacity) / Double(designCapacity) * 100).rounded())
-    }
+    let healthPercentage: Int
 }
 
 final class BatteryMonitor: ObservableObject {
@@ -151,17 +147,18 @@ final class BatteryMonitor: ObservableObject {
         guard IORegistryEntryCreateCFProperties(service, &props, kCFAllocatorDefault, 0) == KERN_SUCCESS,
               let dict = props?.takeRetainedValue() as? [String: Any] else { return }
 
-        guard
-            let cycleCount = dict["CycleCount"] as? Int,
-            let designCapacity = dict["DesignCapacity"] as? Int,
-            let currentMaxCapacity = dict["AppleRawMaxCapacity"] as? Int,
-            designCapacity > 0
-        else { return }
+        guard let cycleCount = dict["CycleCount"] as? Int else { return }
 
-        batteryHealth = BatteryHealthInfo(
-            cycleCount: cycleCount,
-            designCapacity: designCapacity,
-            currentMaxCapacity: currentMaxCapacity
-        )
+        let healthPct: Int
+        if let batteryData = dict["BatteryData"] as? [String: Any],
+           let pct = batteryData["MaxCapacity"] as? Int {
+            healthPct = pct
+        } else if let design = dict["DesignCapacity"] as? Int,
+                  let raw = dict["AppleRawMaxCapacity"] as? Int,
+                  design > 0 {
+            healthPct = Int((Double(raw) / Double(design) * 100).rounded())
+        } else { return }
+
+        batteryHealth = BatteryHealthInfo(cycleCount: cycleCount, healthPercentage: healthPct)
     }
 }
